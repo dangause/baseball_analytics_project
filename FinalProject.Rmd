@@ -1,0 +1,232 @@
+---
+title: "Baseball: Sport of the Future or of the Past"
+author: "Jacob Shashoua and Dan Gause"
+date: "5/19/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+![](baseball.jpg) 
+
+
+### Introduction
+
+Baseball's nationwide following has been one of the United States’ most defining characteristics. America’s pastime has brought people together for over a century, uniting cities across the country in friendly rivalry while providing a common passion for Americans. The game itself has evolved and adapted to a growing nation, adjusting rules as players and strategies steadily improve. Despite its broad historical following, there has been recent talk about a potential decline in Baseball’s popularity, and questions of its future have been raised. Baseball’s cultural importance makes it an ideal candidate for statistical investigation. In this analysis, we used historical data on Major League Baseball statistics. We scraped miscellaneous year-by-year averages and totals from Baseball Reference online. The data can be found here:
+
+https://www.baseball-reference.com/leagues/MLB/misc.shtml
+
+We also used data on total annual home runs hit in the MLB and world series television ratings from the Baseball Almanac. The data can be found here:
+
+http://www.baseball-almanac.com/hitting/hihr6.shtml
+http://www.baseball-almanac.com/ws/wstv.shtml
+
+The main questions we focused on in our analysis are as follows:
+
+  1) How has baseball’s viewership and national interest changed over the years, both in television and game attendance?
+
+  2) What baseball related factors have influenced these trends if any?
+
+Through our statistical examination, we attempted to answer the broader, more speculative question,
+
+**Baseball: American Sport of the Future or of the Past?**
+
+
+
+```{r Data Preparation, echo = FALSE, include=FALSE, warning=FALSE} 
+
+library(data.table)
+library(ggplot2)
+library(stringr)
+library(tidyverse)
+library(rvest)
+library(readxl)
+library(httr)
+library(rsconnect)
+library(dplyr)
+library(leaflet)
+library(geojsonio)
+library(readxl)
+library(chron)
+
+
+attendance.url <-"https://www.baseball-reference.com/leagues/MLB/misc.shtml"
+
+attendance.table <- attendance.url %>%
+  read_html()%>%
+  html_nodes("table") %>%
+  .[[1]] %>%
+  html_table
+
+ratings.table <- read_xlsx("baseball.viewership.xlsx")
+homeruns.table <- read_xlsx("homerun.stats.xlsx")
+
+attendance.table1 <- attendance.table
+attendance.table1 <- attendance.table1[-c(1,26,52,78,104,130),]
+attendance.table1$Attendance <- as.numeric(gsub(",", "", attendance.table1$Attendance))
+attendance.table1$`Attend/G` <- as.numeric(gsub(",", "", attendance.table1$`Attend/G`))
+attendance.table1$Year <- as.numeric(gsub(",", "", attendance.table1$Year))
+attendance.table1$`R/G` <- as.numeric(gsub(",", "", attendance.table1$`R/G`))
+attendance.table1$G <- as.numeric(attendance.table1$G)
+
+table3<- attendance.table1 %>%
+  filter(is.null(Time) == FALSE)%>%
+  mutate(Time2 = as.numeric(substr(Time, 1,1))*60 + as.numeric(substr(Time,3,4)))
+attendance.table1 <- table3
+
+
+population.url <- "https://en.wikipedia.org/wiki/Demography_of_the_United_States"
+population.data <- population.url %>%
+  read_html() %>%
+  html_nodes("table") %>%
+  .[[19]] %>%
+  html_table
+population.table <- population.data[,1:2]
+colnames(population.table) <- c("Year", "Population")
+population.table$Population <- as.numeric(gsub(",", "", population.table$Population))
+
+attendance.table1 <-  left_join(attendance.table1, population.table)
+
+```
+
+### Graphic Representations of Statistical Analysis
+
+
+#### MLB Game Run Time
+
+One of the most common modern complaints of baseball is it's extended run time. Games run for hours, and can last entire evenings. Attending a full game can be a commitment, and even watching a game is naturally time consuming. We graphed average annual MLB game run times over a period of over a century in order to visualize any changes.
+
+```{r Game Time, echo=FALSE, warning=FALSE}
+attendance.table1 %>%
+  ggplot(aes(x = as.numeric(Year),
+             y = Time2)) +
+  geom_point() +
+  labs(title = "MLB Game Run Time",
+       x = "Year",
+       y = "Time")
+```
+
+The length of games has been steadily increasing over time. This can be explained by how baseball as a whole has changed over the years. There is much more strategery in the sport today. This is especially apparent in pitching, with many tactical switches  depending on inning and even right or left-handedness matchup between the batter and pitcher. There are starters, closers, middle relievers and even set up guys. All of these substitutions contribute to a lengthy 9 innings. 
+
+A dip in game length can be seen between 1960 and 1980. This period corresponds with the Second Deadball Era (1963 - roughly 1972). It was a decade in which offensive production was unusually low. In fact, it was, “lowest in baseball history since the Deadball era of the 1900s and 1910s” (baseball reference). 1968 was especially notable as Bob Gibson recorded a 1.12 ERA over 300+ innings and the great Carl Yastrzemski won the AL batting title with the lowest average in history of .301. Rule changes in the batters’ favor were put in place after that season in the effort to boost hitting. The level of the mound was lowered and the strike zone size was tightened. Around this year as the league entered into the 70’s, length of games began to continue their steady increase as batters escaped this collective slump. It is also important to note that during this period, many great pitchers were scattered throughout the league. Sandy Koufax was nearing the end of his reign while Nolan Ryan and many other greats were just beginning their dominance (baseball reference). Another notable rule change came in 1973, again in the effort to boost hitting, when the designated hitter was introduced in the AL (baseball reference). These correlate to game time returning back to the increasing trend in the 1980's.
+
+
+
+#### MLB Game Attendance
+
+The physical attendance of MLB games is an integral part of American culture. Before the age of television and radio, actually attending the games was the only way to enjoy baseball! In the following graphic, we investigate historical MLB game attendance in the United States.
+
+``` {r MLB Game Annual Attendance, echo = FALSE, warning = FALSE}
+
+attendance.table1 %>%
+  ggplot(aes(y= Attendance,
+             x = Year)) +
+  geom_point() +
+  labs(title = "MLB Game Annual Attendance")
+
+```
+
+This data has a interesting trends. There was a clear increase in game attendance over the past century, following a vaguely quadratic fit. There are a few anisotropies in the quadratic fit --- there is a sharp increase in attendance records in the late 1940s, which can likely be attributed to the end of World War II. The return of soldiers and a heightened sense of Nationalism in the United States would have increased game attendance. Additionally, while it is too soon to declare with utmost confidence, there appears to be the beginning of a slump in game attendance in the past few decades. The purely quadratic nature of game attendance over time appears to be broken around the year 2000. There appears to be an inflection point around this time, a local maximum around 2010, and a slight decrease in the past decade. 
+
+
+It is also worth noting the increase in United States population over this period, which clearly would affect total game attendance. In light of this dependence, we collected United States population data from Wikipedia, and weighted the game attendance data by dividing each year's game attendance by the US population of that year.
+
+
+``` {r MLB Weighted Attendance, echo = FALSE, warning = FALSE}
+
+weighted.attendance.model <- lm(Attendance/Population ~ Year,
+                                data = attendance.table1)
+
+weighted.attendance.AIC <- AIC(weighted.attendance.model)
+
+attendance.table1 %>%
+  ggplot(aes(y= Attendance/Population,
+             x = Year)) +
+  geom_point() +
+  geom_abline(slope = weighted.attendance.model$coefficients[2],
+              intercept = weighted.attendance.model$coefficients[1],
+              color = "red",
+              size = 1) +
+  ylab("Weighted Attendance") +
+  ggtitle("Annual MLB Game Attendance weighted by US Population")
+
+```
+
+Under consideration of increasing US population, the data fits a linear model much more closely. A line of best fit was including, which produced an AIC value of `r weighted.attendance.AIC`. In this representation of the data, the variations of the trend are even more convincing. Here we see an even sharper spike in attendance numbers after World War II, and a discernable dip in attendance reconds during World War II. We also see a more fairly clear trend towards falling attendance numbers in the past 10 years. 
+
+Another interesting data point is the outlier for the year 1981. The early 1980s was a time of notable labor strife. In the year of 1981, there was a strike in the MLB that caused the season to be trucated by 713 games, or 38% of the full season. This historically rich event explains the wild variance in attendance records for this particular year. There was also a player strike protesting poor wages in the years 1994 - 1995, which explains the dip in attendance records during these years.
+
+
+
+#### Slugging Analysis
+
+One of the most electrifying parts of Baseball is the homerun, when a batter hits the ball beyond the boundary of the field into the stands. Homeruns are important enough to analyze independently. In the following graphic, we plot average annual homeruns hit per game since the 1920 MLB season. 
+
+``` {r Homeruns, echo=FALSE, warning = FALSE}
+
+hr.table <- NULL
+hr.table <- data.frame(Year = c(1920:2018),
+                       runsPerG = homeruns.table[20:118,3]/as.numeric(attendance.table1[1:99,3]))
+
+p <- hr.table %>%
+  ggplot(aes(x = Year,
+             y = AL.NL)) + 
+  geom_point() +
+  ylab("Homeruns Per Game") +
+  ggtitle("Homeruns per MLB Game") +
+  geom_point(data=hr.table[68, ], aes(x=Year, y=AL.NL), colour="red", size=3)
+
+set.seed(20)
+q <- seq(from=1920, to=2018, by=1)
+y <- 0.4 * (q-10)^2
+function1 <- function(x) ((x-1919)/45)^2 + .3
+
+p + stat_function(fun = function1)
+
+```
+
+
+We see a nicely quadratic increase from ~.5 homeruns per game in the 1920s to ~5 in 2018.
+This increase in homeruns per game strengthens the excitement factor of absolute dingers.
+This homemade "best-fit" line has no real statistical weight, but is included to show an
+approximate quadratic trend to the data.
+
+1987 is refered to as the Year of the Homerun due to the dramatic spike in the number of homeruns compared to the previous and following years. This outlier can be seen highlighted in red on the Homeruns per Game vs Year graph.
+
+#### Television Viewership
+
+``` {r Ratings, echo=FALSE, warning = FALSE}
+
+ratings.table$`Year / Series` <- as.numeric(ratings.table$`Year / Series`)
+ratings.table$Viewers <- as.numeric(ratings.table$Viewers)
+WSViewership.model <- lm(Viewers ~ `Year / Series`,
+                                data = ratings.table)
+ratings.table %>%
+  ggplot(aes(x = `Year / Series`,
+             y = Viewers)) +
+  geom_point() + 
+  geom_abline(slope = WSViewership.model$coefficients[2],
+              intercept = WSViewership.model$coefficients[1],
+              color = "red",
+              size = 1) + 
+  labs(title = "World Series Television Viewership",
+       x = "Year",
+       y = "Viewers") 
+
+```
+
+
+
+This graph represents the world series viewership over time. Modelled with a point graph and a linear best fit line, a decreasing trend over time is apparent. This is specifically world series viewership data, so depending on which teams are involved, some year to year variation is expected. However, the best fit line clearly shows the overall decreasing trend. Being only world series games, this is a great reference for baseball viewership as a whole. It is a random matchup every year that represents the culmanation of the entire season, so most baseball fans tune in for these big games, where as individual regular season games are likely much more dependent on which cities are involved.
+
+
+### Concluding Remarks
+
+
+Our graphics and data analysis have revealed interesting trends. Most factors have tended to increase over time. These increases point to an increasingly popular and exciting sport. Game attendance clearly reflects this as more and more people have flocked to stadiums all over the country every year. As mentioned, recently attendance seems to be decreasing, but it is too recent of a trend to determine with confidence that this is a lasting pattern. One would expect viewership to be on the rise in the same way as attendance, however this is not the case. Viewership has done just the opposite as game attendance. Fewer people are tuning in to watch the sport on tv. What is to blame for this? Lengthy games certainly plays a part. Many critics of baseball complain about how long games have become. While games are getting longer, fewer people seem to be willing to sit and watch an entire near 3 hour game. In addition to game length, tv has a large role in this decreasing trend seen with viewership. Where baseball used to dominate people’s screens, there continues to be an ever growing number of other options to choose from. Whether it be other sports, reality tv, or even streaming sites like netflix, for many people these alternatives have become more appealing and convenient. This all raises the question of where is baseball headed in the future? The sport’s intricacies, ballparks, and history continue to bring fans back every year, so based on our data analysis, the sport’s popularity likely is not at stake. Players continue to improve and shock us every day, breaking records and hitting balls out of the park. Baseball’s only concern is tv viewership as longer games and tv trends in general seem to be hurting the sport’s on screen presence. 
+
+Future analysis would include any rule changes, and how these changes impact these trends. An example of a looming potential change is the incorporation of pitch clocks, similar to shot clocks in basketball. They are used in some college and minor leagues, so the idea is not completely foreign. They ideally would help to restrict game duration in the hope to boost baseball's tv presence. While game duration may decrease, it would be interesting to see if the decreasing viewership trend would turn around. However, a pitch clock could also damage the integrity of the game and in turn hurt the sport’s popularity. Rule changes are infrequent, but investigating their impact on these trends would be fascinating. 
+
+Another topic of interest for the future is the history of trading in the MLB and how this has impacted the sport. For example, trade deadlines, free agency and enormous contracts may have an impact on a fan’s attachment to their team and the sport in general. Presumably, a fan would be more passionate when they can establish a connection towards their team’s players. How this has changed throughout history and how this has affected trends is what we would want to find out. Only the numbers can tell this story, so this would be our next topic to explore.
